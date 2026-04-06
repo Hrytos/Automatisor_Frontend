@@ -28,46 +28,22 @@ interface SectionCardProps {
   isLocked: boolean;
 }
 
-function renderBody(body: string) {
+function parseBody(body: string): { paragraphs: string[]; bullets: string[] } {
   const lines = body.split("\n");
-  const elements: React.ReactNode[] = [];
-  let bulletBuffer: string[] = [];
-  let key = 0;
-
-  const flushBullets = () => {
-    if (bulletBuffer.length === 0) return;
-    elements.push(
-      <ul key={key++} className="space-y-2">
-        {bulletBuffer.map((text, i) => (
-          <li key={i} className="relative text-[15px] leading-[1.7] text-ink-mid">
-            <span className="absolute left-[-1rem] top-[0.62em] w-[5px] h-[5px] rounded-full bg-orange/60 shrink-0" />
-            {text}
-          </li>
-        ))}
-      </ul>
-    );
-    bulletBuffer = [];
-  };
+  const paragraphs: string[] = [];
+  const bullets: string[] = [];
 
   for (const raw of lines) {
     const line = raw.trim();
-    if (!line) {
-      flushBullets();
-      continue;
-    }
+    if (!line) continue;
     if (line.startsWith("- ") || line.startsWith("• ")) {
-      bulletBuffer.push(line.slice(2));
+      bullets.push(line.slice(2));
     } else {
-      flushBullets();
-      elements.push(
-        <p key={key++} className="text-[15px] leading-[1.75] text-ink-mid">
-          {line}
-        </p>
-      );
+      paragraphs.push(line);
     }
   }
-  flushBullets();
-  return elements;
+
+  return { paragraphs, bullets };
 }
 
 export function SectionCard({ section, slug, isLocked }: SectionCardProps) {
@@ -116,7 +92,42 @@ export function SectionCard({ section, slug, isLocked }: SectionCardProps) {
         <div
           className={`pl-12 space-y-4 ${isLocked ? "max-h-[120px] overflow-hidden" : ""}`}
         >
-          {renderBody(section.body)}
+          {(() => {
+            const { paragraphs, bullets } = parseBody(section.body);
+            const topThree = bullets.slice(0, 3);
+            return (
+              <>
+                {paragraphs.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-[12px] font-semibold uppercase tracking-widest text-ink-soft">
+                      Snapshot
+                    </p>
+                    {paragraphs.map((text, i) => (
+                      <p key={i} className="text-[15px] leading-[1.75] text-ink-mid">
+                        {text}
+                      </p>
+                    ))}
+                  </div>
+                )}
+
+                {topThree.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-[12px] font-semibold uppercase tracking-widest text-ink-soft">
+                      Top 3 Risks
+                    </p>
+                    <ul className="space-y-2">
+                      {topThree.map((text, i) => (
+                        <li key={i} className="relative pl-4 text-[15px] leading-[1.7] text-ink-mid">
+                          <span className="absolute left-0 top-[0.62em] w-[5px] h-[5px] rounded-full bg-orange/60 shrink-0" />
+                          {text}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </div>
       </div>
 
