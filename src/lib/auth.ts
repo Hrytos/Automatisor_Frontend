@@ -9,6 +9,8 @@ export interface AuthSession {
   account_id: string | null;
   is_admin: boolean;
   email: string;
+  first_name?: string | null;
+  last_name?: string | null;
 }
 
 export function getAuthSession(): AuthSession | null {
