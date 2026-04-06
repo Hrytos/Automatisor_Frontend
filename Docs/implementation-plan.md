@@ -44,7 +44,8 @@ Browser
 │                                   │                        │
 │                          lib/                             │
 │                          ├─ auth.ts (sessionStorage)      │
-│                          └─ tracking.ts (localStorage)    │
+│                          ├─ posthog.ts (PostHog init)     │
+│                          └─ tracking.ts (PostHog+Supabase)│
 └────────────────────────────┬──────────────────────────────┘
                              │  server-side rewrite
                              │  BACKEND_URL env var
@@ -257,15 +258,9 @@ Summary view → "Submit & Regenerate" clicked
 
 ## 7. Tracking System
 
-`src/lib/tracking.ts` implements a lightweight client-side event log stored in `localStorage`.
+`src/lib/tracking.ts` is the central tracking hub. All named functions dual-write to **PostHog** (cloud analytics) and **Supabase** (`Automatisor_user_events` table) in parallel via fire-and-forget `fetch` calls.
 
-Events logged:
-- `page_view` — on every report page load
-- `section_view` — when a section scrolls into view
-- `scroll_depth` — at 25%, 50%, 75%, 100%
-- `unlock` — when a user completes OTP login from a report page
-
-Events are stored in `localStorage` as an array (max 500 items). Currently used for local analytics only — no backend flush yet.
+See **Phase 9** for the full event catalogue, architecture diagram, and implementation details.
 
 ---
 
@@ -368,6 +363,104 @@ Events are stored in `localStorage` as an array (max 500 items). Currently used 
 
 ---
 
+### Phase 9 — Analytics & Tracking ✅ (Complete)
+
+Full event tracking integration using PostHog (cloud analytics) and Supabase (persistent storage).
+
+#### Architecture
+
+```
+User action
+  │
+  ├─► PostHog (cloud)       — real-time analytics, funnels, session replay
+  └─► /api/events (backend) — Supabase `Automatisor_user_events` table
+```
+
+All events are dual-written: PostHog for analytics dashboards, Supabase for raw queryable history. Neither path blocks the UI — all writes are fire-and-forget.
+
+#### Files
+
+| File | Purpose |
+|---|---|
+| `src/lib/posthog.ts` | PostHog singleton. SSR-safe init (`typeof window` guard), `autocapture: true` |
+| `src/components/providers/PostHogProvider.tsx` | Client wrapper mounted in root layout. Initialises PostHog, identifies user on load and on auth changes, resets on logout |
+| `src/lib/tracking.ts` | Central tracking hub. All named tracking functions call PostHog + backend in parallel |
+| `src/hooks/useSiteTimeTracking.ts` | Measures time spent per site. Fires on unmount, tab hide, page close |
+| `src/hooks/useScrollTracking.ts` | Fires scroll depth milestones (25/50/75/100%) |
+
+#### Environment variables
+
+```env
+NEXT_PUBLIC_POSTHOG_KEY=phc_...        # Project API key from PostHog → Project Settings
+NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com
+```
+
+#### Event catalogue
+
+| Event name | Fired from | Key properties |
+|---|---|---|
+| `user_signed_in` | `login-form.tsx` on OTP verify | `email`, `account_id`, `is_admin` |
+| `$pageview` | `ReportView.tsx` on mount | `report_id` |
+| `scroll_depth` | `useScrollTracking` | `report_id`, `depth_percent` (25/50/75/100) |
+| `section_view` | `SectionCard.tsx` IntersectionObserver | `report_id`, `section_id` |
+| `report_unlocked` | `UnlockOverlay` / `trackUnlock()` | `report_id`, `email` |
+| `site_time_spent` | `useSiteTimeTracking` on unmount/hide/close | `report_id`, `site_id`, `site_name`, `site_location`, `duration_seconds` |
+| `site_switcher_opened` | Report page dropdown button | `report_id`, `site_name`, `available_sites` |
+| `site_switched` | Report page dropdown item click | `from_report_id`, `from_site_name`, `to_report_id`, `to_site_name` |
+| `report_card_clicked` | `/reports` page card click | `report_id`, `site_name`, `site_location` |
+| *(autocapture)* | PostHog SDK automatically | All button clicks, form interactions |
+
+#### User identity
+
+- `posthog.identify(user_id, { email, account_id, is_admin })` called on OTP verify and on page load if session exists
+- `posthog.reset()` called on sign-out
+- Anonymous users tracked by PostHog's auto-assigned distinct ID; `user_id` column is `null` in Supabase
+
+#### Supabase storage
+
+Table: `Automatisor_user_events`
+
+```sql
+id          uuid  PK
+event_type  text  not null
+user_id     text  null (anonymous sessions)
+email       text  null
+report_id   text  null
+site_id     text  null
+site_name   text  null
+properties  jsonb default '{}'
+created_at  timestamptz default now()
+```
+
+RLS enabled — all writes go through the service-role backend only. No direct browser access to this table.
+
+#### `site_time_spent` detail
+
+The `useSiteTimeTracking(report)` hook starts a timer when a report loads. It fires in three scenarios:
+
+1. **Site switch** — user clicks a different site in the dropdown; cleanup fires for the old site, new effect starts for the new one
+2. **Tab hidden** — `visibilitychange` → `"hidden"` (tab switch or browser minimise)
+3. **Page close** — `beforeunload` event
+
+The `firedRef` guard ensures the event fires exactly once per site session even if multiple triggers overlap.
+
+#### Items completed
+
+- [x] `posthog-js` installed
+- [x] `src/lib/posthog.ts` — SSR-safe init
+- [x] `PostHogProvider` in root layout
+- [x] `tracking.ts` rewired: all functions dual-write to PostHog + Supabase
+- [x] `useSiteTimeTracking` hook — per-site time tracking
+- [x] `user_signed_in` event on OTP verify with `posthog.identify()`
+- [x] Site switcher events (`site_switcher_opened`, `site_switched`)
+- [x] `report_card_clicked` on `/reports` page
+- [x] `Automatisor_user_events` Supabase table + indexes + RLS
+- [x] `POST /events` FastAPI endpoint (service-role write, fire-and-forget)
+- [x] `.env.local` updated with `NEXT_PUBLIC_POSTHOG_KEY` and `NEXT_PUBLIC_POSTHOG_HOST`
+- [x] Production build passes — zero TypeScript errors
+
+---
+
 ### Phase 9 — Markdown Rendering (Planned)
 
 Report section `body` fields contain markdown. Currently rendered as plain text.
@@ -399,13 +492,11 @@ Currently in the sidebar as "Coming Soon". Will require new backend endpoints.
 
 ---
 
-### Phase 12 — Analytics Dashboard (Planned)
+### Phase 12 — Analytics Dashboard ✅ (Superseded by Phase 9)
 
-Flush the client-side tracking event log to the backend and surface it in an admin view.
+Event tracking to Supabase and PostHog was completed as part of Phase 9. Raw events are queryable directly in Supabase (`Automatisor_user_events`). PostHog cloud provides dashboards, funnels, and session replay out of the box.
 
-- [ ] `POST /api/tracking/events` — batch flush endpoint
-- [ ] Flush on page unload (`visibilitychange` → `sendBeacon`)
-- [ ] Admin page: per-report view counts, scroll depth heatmap, unlock conversion rate
+A custom admin analytics UI remains optional future work if needed beyond what PostHog provides.
 
 ---
 

@@ -9,6 +9,7 @@ import { Navbar } from "@/components/layout/Navbar";
 import { cn } from "@/lib/utils";
 import { getAuthSession, isAdmin } from "@/lib/auth";
 import { ReportSidebar } from "@/components/report/ReportSidebar";
+import { trackEvent } from "@/lib/tracking";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -435,6 +436,7 @@ export default function QuestionnairePage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [regenerationStatus, setRegenerationStatus] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const savedAnswersRef = useRef<Answers>({});
 
   const sectionKey = `qs_section_${reportId}`;
   const viewKey    = `qs_view_${reportId}`;
@@ -483,7 +485,9 @@ export default function QuestionnairePage() {
 
       const data = await res.json();
       // answers may be null on brand-new rows — fall back to empty object
-      setAnswers((data.answers as Answers) ?? {});
+      const loadedAnswers = (data.answers as Answers) ?? {};
+      setAnswers(loadedAnswers);
+      savedAnswersRef.current = loadedAnswers;
       if (data.site_name) setSiteName(data.site_name);
       if (data.site_address || data.site_location)
         setSiteAddress(data.site_address || data.site_location);
@@ -587,6 +591,16 @@ export default function QuestionnairePage() {
         credentials: "include",
         body: JSON.stringify({ answers }),
       });
+      // Fire event if answers differ from what was last loaded/saved
+      if (JSON.stringify(answers) !== JSON.stringify(savedAnswersRef.current)) {
+        trackEvent("questionnaire_modified_no_regen", reportId, {
+          site_name: siteName,
+          changed_fields: Object.keys(answers).filter(
+            (k) => JSON.stringify(answers[k]) !== JSON.stringify(savedAnswersRef.current[k])
+          ),
+        });
+        savedAnswersRef.current = { ...answers };
+      }
     } catch {
       // Silent — data is preserved in state
     }
@@ -620,6 +634,7 @@ export default function QuestionnairePage() {
         throw new Error(d.detail || `Failed to queue regeneration (${regenRes.status})`);
       }
       setRegenerationStatus("queued");
+      trackEvent("report_regenerated", reportId, { site_name: siteName });
       setView("questions");
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err: unknown) {

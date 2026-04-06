@@ -1,33 +1,32 @@
 "use client";
 
-const VISITOR_KEY = "automatisor_visitor_id";
-const EVENTS_KEY = "automatisor_events";
+import { posthog } from "@/lib/posthog";
+import { getAuthSession } from "@/lib/auth";
 
-function getVisitorId(): string {
-  if (typeof window === "undefined") return "";
-  let id = localStorage.getItem(VISITOR_KEY);
-  if (!id) {
-    id = crypto.randomUUID();
-    localStorage.setItem(VISITOR_KEY, id);
-  }
-  return id;
-}
-
-interface TrackingEvent {
-  visitor_id: string;
+interface EventBody {
   event_type: string;
-  slug: string;
-  event_data: Record<string, unknown>;
-  timestamp: number;
+  user_id?: string;
+  email?: string;
+  report_id?: string;
+  site_id?: string;
+  site_name?: string;
+  properties: Record<string, unknown>;
 }
 
-function pushEvent(event: TrackingEvent) {
-  const raw = localStorage.getItem(EVENTS_KEY);
-  const events: TrackingEvent[] = raw ? JSON.parse(raw) : [];
-  events.push(event);
-  // Keep last 500 events
-  if (events.length > 500) events.splice(0, events.length - 500);
-  localStorage.setItem(EVENTS_KEY, JSON.stringify(events));
+function persistEvent(body: EventBody) {
+  // Fire-and-forget — never blocks the UI
+  const session = getAuthSession();
+  const payload: EventBody = {
+    ...body,
+    user_id: body.user_id ?? session?.user_id,
+    email:   body.email   ?? session?.email,
+  };
+  fetch("/api/events", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(payload),
+  }).catch(() => {}); // silently swallow network errors
 }
 
 export function trackEvent(
@@ -35,28 +34,34 @@ export function trackEvent(
   slug: string,
   data: Record<string, unknown> = {}
 ) {
-  const event: TrackingEvent = {
-    visitor_id: getVisitorId(),
+  posthog.capture(eventType, { report_id: slug, ...data });
+  const { site_id, site_name, ...rest } = data;
+  persistEvent({
     event_type: eventType,
-    slug,
-    event_data: data,
-    timestamp: Date.now(),
-  };
-  pushEvent(event);
+    report_id: slug,
+    site_id: typeof site_id === "string" ? site_id : undefined,
+    site_name: typeof site_name === "string" ? site_name : undefined,
+    properties: rest,
+  });
 }
 
 export function trackPageView(slug: string) {
-  trackEvent("page_view", slug);
+  posthog.capture("$pageview", { report_id: slug });
+  persistEvent({ event_type: "page_view", report_id: slug, properties: {} });
 }
 
 export function trackSectionView(slug: string, sectionId: string) {
-  trackEvent("section_view", slug, { section_id: sectionId });
+  posthog.capture("section_view", { report_id: slug, section_id: sectionId });
+  persistEvent({ event_type: "section_view", report_id: slug, properties: { section_id: sectionId } });
 }
 
 export function trackScrollDepth(slug: string, depth: number) {
-  trackEvent("scroll_depth", slug, { depth_percent: depth });
+  posthog.capture("scroll_depth", { report_id: slug, depth_percent: depth });
+  persistEvent({ event_type: "scroll_depth", report_id: slug, properties: { depth_percent: depth } });
 }
 
 export function trackUnlock(slug: string, email: string) {
-  trackEvent("unlock", slug, { email });
+  posthog.capture("report_unlocked", { report_id: slug, email });
+  persistEvent({ event_type: "report_unlocked", report_id: slug, email, properties: {} });
 }
+

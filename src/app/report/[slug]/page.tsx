@@ -10,6 +10,8 @@ import { ReportSidebar } from "@/components/report/ReportSidebar";
 import { getAuthSession, isAdmin, clearAuthSession } from "@/lib/auth";
 import { FREE_SECTION_IDS } from "@/types/report";
 import type { Report } from "@/types/report";
+import { posthog } from "@/lib/posthog";
+import { useSiteTimeTracking } from "@/hooks/useSiteTimeTracking";
 
 interface SiteSwitcherItem {
   report_id: string;
@@ -32,6 +34,9 @@ export default function ReportPage() {
   const [siteList, setSiteList]           = useState<SiteSwitcherItem[]>([]);
   const [switcherOpen, setSwitcherOpen]   = useState(false);
   const [adminUser, setAdminUser]         = useState(false);
+
+  // Track time spent on each site — fires automatically on site switch or page leave
+  useSiteTimeTracking(report);
 
   useEffect(() => {
     setAdminUser(isAdmin());
@@ -122,7 +127,17 @@ export default function ReportPage() {
   const siteSwitcher = siteList.length > 1 ? (
     <div className="relative">
       <button
-        onClick={() => setSwitcherOpen((o) => !o)}
+        onClick={() => {
+          const opening = !switcherOpen;
+          setSwitcherOpen(opening);
+          if (opening) {
+            posthog.capture("site_switcher_opened", {
+              report_id: slug,
+              site_name: report?.site_name,
+              available_sites: siteList.length,
+            });
+          }
+        }}
         className="flex items-center gap-1.5 text-sm text-ink-mid hover:text-ink border border-ink/10 rounded-lg px-3 py-1.5 bg-surface hover:bg-white transition-colors"
       >
         Switch site
@@ -135,6 +150,14 @@ export default function ReportPage() {
               key={s.report_id}
               onClick={() => {
                 setSwitcherOpen(false);
+                if (s.report_id !== slug) {
+                  posthog.capture("site_switched", {
+                    from_report_id: slug,
+                    from_site_name: report?.site_name,
+                    to_report_id: s.report_id,
+                    to_site_name: s.site_name,
+                  });
+                }
                 const dest = accountParam
                   ? `/report/${s.report_id}?account=${accountParam}`
                   : `/report/${s.report_id}`;

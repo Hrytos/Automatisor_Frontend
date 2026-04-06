@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2, MapPin, ArrowRight } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { getAuthSession } from "@/lib/auth";
+import { posthog } from "@/lib/posthog";
 
 interface ReportSummary {
   report_id: string;
@@ -84,7 +85,14 @@ export default function MyReportsPage() {
             {reports.map((r) => (
               <button
                 key={r.report_id}
-                onClick={() => router.push(`/report/${r.report_id}`)}
+                onClick={() => {
+                  posthog.capture("report_card_clicked", {
+                    report_id: r.report_id,
+                    site_name: r.site_name,
+                    site_location: r.site_location,
+                  });
+                  router.push(`/report/${r.report_id}`);
+                }}
                 className="w-full text-left bg-white border border-ink/10 rounded-xl px-5 py-4 hover:border-orange/40 hover:shadow-sm transition-all group"
               >
                 <div className="flex items-center justify-between gap-4">

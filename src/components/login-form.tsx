@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { setAuthSession } from "@/lib/auth"
+import { posthog } from "@/lib/posthog"
 
 type Step = "email" | "otp"
 
@@ -68,6 +69,18 @@ export function LoginForm({
         account_id: data.account_id ?? null,
         is_admin: data.is_admin ?? false,
         email,
+      })
+
+      // Identify and track the sign-in event in PostHog
+      posthog.identify(data.user_id, {
+        email,
+        account_id: data.account_id ?? null,
+        is_admin: data.is_admin ?? false,
+      })
+      posthog.capture("user_signed_in", {
+        email,
+        account_id: data.account_id ?? null,
+        is_admin: data.is_admin ?? false,
       })
 
       // Admins land on the admin create-report page directly

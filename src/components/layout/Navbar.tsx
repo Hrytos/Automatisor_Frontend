@@ -55,7 +55,7 @@ export function Navbar() {
     clearAuthSession();
     setSession(null);
     setOpen(false);
-    window.location.reload();
+    window.location.href = "/login";
   }
 
   function openSignIn() {
