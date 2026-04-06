@@ -33,7 +33,9 @@ export function UnlockOverlay({ slug, onUnlock }: UnlockOverlayProps) {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        setError(body.detail ?? "Failed to send code. Check your email address.");
+        setError(
+          body.detail ?? "Failed to send code. Check your email address.",
+        );
         return;
       }
       setStep("otp");
@@ -54,7 +56,11 @@ export function UnlockOverlay({ slug, onUnlock }: UnlockOverlayProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ email: email.trim(), token: token.trim(), report_id: slug }),
+        body: JSON.stringify({
+          email: email.trim(),
+          token: token.trim(),
+          report_id: slug,
+        }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -67,6 +73,8 @@ export function UnlockOverlay({ slug, onUnlock }: UnlockOverlayProps) {
         account_id: body.account_id ?? null,
         is_admin: body.is_admin ?? false,
         email: email.trim(),
+        first_name: body.first_name ?? null,
+        last_name: body.last_name ?? null,
       });
       trackUnlock(slug, email.trim());
       onUnlock();
@@ -97,7 +105,10 @@ export function UnlockOverlay({ slug, onUnlock }: UnlockOverlayProps) {
               Enter your company email address. We&apos;ll send you a one-time
               code to sign in.
             </p>
-            <form onSubmit={handleSendOtp} className="flex gap-2 max-w-sm mx-auto">
+            <form
+              onSubmit={handleSendOtp}
+              className="flex gap-2 max-w-sm mx-auto"
+            >
               <Input
                 type="email"
                 placeholder="email@company.com"
@@ -106,8 +117,14 @@ export function UnlockOverlay({ slug, onUnlock }: UnlockOverlayProps) {
                 required
                 className="flex-1 bg-surface border-ink/10 text-ink placeholder:text-ink-soft/50"
               />
-              <Button type="submit" disabled={loading} className="gap-1.5 shrink-0">
-                {loading ? "..." : (
+              <Button
+                type="submit"
+                disabled={loading}
+                className="gap-1.5 shrink-0"
+              >
+                {loading ? (
+                  "..."
+                ) : (
                   <>
                     <Mail className="w-3.5 h-3.5" />
                     Send Code
@@ -122,10 +139,14 @@ export function UnlockOverlay({ slug, onUnlock }: UnlockOverlayProps) {
               Check Your Email
             </h3>
             <p className="text-sm text-ink-soft font-light leading-relaxed mb-6 max-w-sm mx-auto">
-              We sent a 6-digit code to <span className="text-ink font-medium">{email}</span>.
-              Enter it below.
+              We sent a 6-digit code to{" "}
+              <span className="text-ink font-medium">{email}</span>. Enter it
+              below.
             </p>
-            <form onSubmit={handleVerifyOtp} className="flex gap-2 max-w-sm mx-auto">
+            <form
+              onSubmit={handleVerifyOtp}
+              className="flex gap-2 max-w-sm mx-auto"
+            >
               <Input
                 type="text"
                 inputMode="numeric"
@@ -136,8 +157,14 @@ export function UnlockOverlay({ slug, onUnlock }: UnlockOverlayProps) {
                 required
                 className="flex-1 bg-surface border-ink/10 text-ink placeholder:text-ink-soft/50 tracking-widest text-center text-lg"
               />
-              <Button type="submit" disabled={loading || token.length < 6} className="gap-1.5 shrink-0">
-                {loading ? "..." : (
+              <Button
+                type="submit"
+                disabled={loading || token.length < 6}
+                className="gap-1.5 shrink-0"
+              >
+                {loading ? (
+                  "..."
+                ) : (
                   <>
                     Verify
                     <ArrowRight className="w-3.5 h-3.5" />
@@ -146,7 +173,11 @@ export function UnlockOverlay({ slug, onUnlock }: UnlockOverlayProps) {
               </Button>
             </form>
             <button
-              onClick={() => { setStep("email"); setToken(""); setError(null); }}
+              onClick={() => {
+                setStep("email");
+                setToken("");
+                setError(null);
+              }}
               className="text-xs text-ink-soft/60 mt-4 hover:text-ink-soft transition-colors"
             >
               Use a different email
@@ -154,9 +185,7 @@ export function UnlockOverlay({ slug, onUnlock }: UnlockOverlayProps) {
           </>
         )}
 
-        {error && (
-          <p className="text-xs text-red-500 mt-3">{error}</p>
-        )}
+        {error && <p className="text-xs text-red-500 mt-3">{error}</p>}
 
         <p className="text-[11px] text-ink-soft/40 mt-4">
           Enter any email to access your report.

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Mail, KeyRound, Loader2, LogOut, ChevronDown, FileText } from "lucide-react";
 import { getAuthSession, setAuthSession, clearAuthSession, type AuthSession } from "@/lib/auth";
+import { FreshchatWidget } from "@/components/FreshchatWidget";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -114,6 +115,8 @@ export function Navbar() {
         account_id: body.account_id ?? null,
         is_admin: body.is_admin ?? false,
         email: email.trim(),
+        first_name: body.first_name ?? null,
+        last_name: body.last_name ?? null,
       };
       setAuthSession(newSession);
       setSession(newSession);
@@ -135,9 +138,25 @@ export function Navbar() {
   const initials = session?.email
     ? session.email.slice(0, 2).toUpperCase()
     : null;
+  const isProtectedRoute =
+    pathname === "/reports" ||
+    pathname === "/report/create" ||
+    pathname?.startsWith("/report/") ||
+    pathname?.startsWith("/questionnaire/");
+  const enableFreshchat = mounted && Boolean(session) && Boolean(isProtectedRoute);
+  const freshchatIdentity = session
+    ? {
+        externalId: session.user_id,
+        email: session.email,
+        firstName: session.first_name ?? null,
+        lastName: session.last_name ?? null,
+      }
+    : null;
 
   return (
-    <nav className="sticky top-0 z-50 flex items-center justify-between border-b border-ink/10 bg-white px-6 py-4 md:px-12">
+    <>
+      <FreshchatWidget enabled={enableFreshchat} identity={freshchatIdentity} />
+      <nav className="sticky top-0 z-50 flex items-center justify-between border-b border-ink/10 bg-white px-6 py-4 md:px-12">
       {/* Logo */}
       <Link href="/" className="flex items-center gap-2">
         <span className="font-serif text-xl text-ink tracking-tight">
@@ -264,6 +283,7 @@ export function Navbar() {
           )}
         </div>
       )}
-    </nav>
+      </nav>
+    </>
   );
 }

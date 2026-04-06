@@ -1,96 +1,100 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { Loader2 } from "lucide-react"
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { setAuthSession } from "@/lib/auth"
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { setAuthSession } from "@/lib/auth";
 
-type Step = "email" | "otp"
+type Step = "email" | "otp";
 
 export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
-  const router = useRouter()
-  const [step, setStep] = useState<Step>("email")
-  const [email, setEmail] = useState("")
-  const [otp, setOtp] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const router = useRouter();
+  const [step, setStep] = useState<Step>("email");
+  const [email, setEmail] = useState("");
+  const [otp, setOtp] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleSendOtp(e: React.FormEvent) {
-    e.preventDefault()
-    setError(null)
-    setLoading(true)
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
     try {
       const res = await fetch(`/api/auth/otp/send`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ email }),
-      })
+      });
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail || "Failed to send verification code.")
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail || "Failed to send verification code.");
       }
-      setStep("otp")
+      setStep("otp");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Something went wrong.")
+      setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
   async function handleVerifyOtp(e: React.FormEvent) {
-    e.preventDefault()
-    setError(null)
-    setLoading(true)
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
     try {
       const res = await fetch(`/api/auth/otp/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ email, token: otp }),
-      })
+      });
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.detail || "Invalid or expired code.")
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail || "Invalid or expired code.");
       }
-      const data = await res.json()
+      const data = await res.json();
       // Store only non-sensitive metadata — the JWT is in the HttpOnly cookie
       setAuthSession({
         user_id: data.user_id,
         account_id: data.account_id ?? null,
         is_admin: data.is_admin ?? false,
         email,
-      })
+        first_name: data.first_name ?? null,
+        last_name: data.last_name ?? null,
+      });
 
       // Admins land on the admin create-report page directly
       if (data.is_admin) {
-        router.push("/report/create")
-        return
+        router.push("/report/create");
+        return;
       }
 
       // Regular users: fetch their reports and navigate to the first one
-      const reportsRes = await fetch(`/api/reports`, { credentials: "include" })
+      const reportsRes = await fetch(`/api/reports`, {
+        credentials: "include",
+      });
       if (reportsRes.ok) {
-        const reports = await reportsRes.json()
+        const reports = await reportsRes.json();
         if (Array.isArray(reports) && reports.length > 0) {
-          router.push(`/report/${reports[0].report_id}`)
-          return
+          router.push(`/report/${reports[0].report_id}`);
+          return;
         }
       }
       // No reports found
-      router.push("/no-report")
+      router.push("/no-report");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Something went wrong.")
+      setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
@@ -98,7 +102,6 @@ export function LoginForm({
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card className="overflow-hidden p-0">
         <CardContent className="grid p-0 md:grid-cols-2">
-
           {/* ── Left: OTP form ── */}
           {step === "email" ? (
             <form
@@ -192,9 +195,9 @@ export function LoginForm({
               <button
                 type="button"
                 onClick={() => {
-                  setStep("email")
-                  setOtp("")
-                  setError(null)
+                  setStep("email");
+                  setOtp("");
+                  setError(null);
                 }}
                 className="text-sm text-muted-foreground hover:underline underline-offset-2 text-center cursor-pointer"
               >
@@ -247,25 +250,27 @@ export function LoginForm({
                 Data-driven operations assessments for warehouse automation.
               </p>
               <div className="flex flex-col gap-2 mt-2 w-full max-w-[200px]">
-                {["Evidence-based scoring", "No vendor affiliation", "Operator-first analysis"].map(
-                  (item) => (
-                    <div key={item} className="flex items-center gap-2 text-xs text-zinc-400">
-                      <div className="w-1 h-1 rounded-full bg-[#E8532A] flex-shrink-0" />
-                      {item}
-                    </div>
-                  )
-                )}
+                {[
+                  "Evidence-based scoring",
+                  "No vendor affiliation",
+                  "Operator-first analysis",
+                ].map((item) => (
+                  <div
+                    key={item}
+                    className="flex items-center gap-2 text-xs text-zinc-400"
+                  >
+                    <div className="w-1 h-1 rounded-full bg-[#E8532A] flex-shrink-0" />
+                    {item}
+                  </div>
+                ))}
               </div>
             </div>
           </div>
-
         </CardContent>
       </Card>
       <p className="text-xs text-muted-foreground text-center px-6">
         Access is restricted to invited contacts only.
       </p>
     </div>
-  )
+  );
 }
-
-
