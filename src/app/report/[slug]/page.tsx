@@ -120,6 +120,23 @@ export default function ReportPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [report?.regeneration_status]);
 
+  // ── Broadcast regen status so the Navbar notification bell can react ─────────
+  useEffect(() => {
+    const status = report?.regeneration_status ?? null;
+    const siteName = report?.site_name ?? "";
+    window.dispatchEvent(
+      new CustomEvent("automatisor:regen-status", { detail: { status, report_id: slug, site_name: siteName } })
+    );
+    try {
+      if (status === "queued") {
+        sessionStorage.setItem("regen_pending", JSON.stringify({ report_id: slug, site_name: siteName }));
+      } else {
+        sessionStorage.removeItem("regen_pending");
+      }
+    } catch { /* ignore */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [report?.regeneration_status]);
+
   if (notFoundFlag || !report) {
     if (!loading) notFound();
   }
@@ -187,15 +204,6 @@ export default function ReportPage() {
           isAdmin={adminUser}
         />
         <main className="flex-1 overflow-y-auto relative">
-          {/* ── Regeneration in-progress banner ── */}
-          {report?.regeneration_status === "queued" && !loading && (
-            <div className="flex items-center gap-2.5 px-5 py-3 bg-orange/8 border-b border-orange/20">
-              <Loader2 className="w-3.5 h-3.5 text-orange animate-spin flex-shrink-0" />
-              <p className="text-[13px] text-orange font-medium">
-                Your report is being regenerated — this takes around 5 minutes. The page will update automatically.
-              </p>
-            </div>
-          )}
           {report?.regeneration_status === "error" && !loading && (
             <div className="flex items-center gap-2.5 px-5 py-3 bg-red-50 border-b border-red-200">
               <p className="text-[13px] text-red-700 font-medium">
@@ -206,6 +214,92 @@ export default function ReportPage() {
           {loading ? (
             <div className="flex h-full items-center justify-center">
               <Loader2 className="w-6 h-6 text-ink-soft animate-spin" />
+            </div>
+          ) : report?.regeneration_status === "queued" ? (
+            /* ── Full-screen regeneration animation ── */
+            <div
+              className="absolute inset-0 flex flex-col items-center justify-center gap-10 overflow-hidden"
+              style={{ background: "linear-gradient(160deg, var(--color-surface) 0%, #fff 60%, color-mix(in srgb, var(--color-orange) 6%, white) 100%)" }}
+            >
+              {/* Orbiting rings — explicit w-48 h-48 so nothing bleeds outside */}
+              <div className="relative w-48 h-48 flex-shrink-0 flex items-center justify-center">
+                {/* Outer ring */}
+                <div
+                  className="absolute inset-0 rounded-full border-2 border-orange/15"
+                  style={{ animation: "spin 8s linear infinite" }}
+                />
+                {/* Middle ring */}
+                <div
+                  className="absolute w-36 h-36 rounded-full border-2 border-orange/25"
+                  style={{ animation: "spin 5s linear infinite reverse" }}
+                />
+                {/* Inner ring */}
+                <div
+                  className="absolute w-24 h-24 rounded-full border-2 border-orange/40"
+                  style={{ animation: "spin 3s linear infinite" }}
+                />
+                {/* Orbit dot — outer (contained inside w-48 h-48) */}
+                <div className="absolute inset-0" style={{ animation: "spin 8s linear infinite" }}>
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-orange/50" />
+                </div>
+                {/* Orbit dot — middle */}
+                <div className="absolute w-36 h-36" style={{ animation: "spin 5s linear infinite reverse" }}>
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-orange/70" />
+                </div>
+                {/* Center pulsing circle */}
+                <div
+                  className="w-16 h-16 rounded-full bg-orange/10 flex items-center justify-center"
+                  style={{ animation: "pulse 2s ease-in-out infinite" }}
+                >
+                  <div
+                    className="w-10 h-10 rounded-full bg-orange/20 flex items-center justify-center"
+                    style={{ animation: "pulse 2s ease-in-out infinite 0.3s" }}
+                  >
+                    <Loader2 className="w-5 h-5 text-orange animate-spin" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Text block */}
+              <div className="text-center flex flex-col items-center gap-3 px-6">
+                <h2 className="text-2xl font-bold tracking-tight" style={{ color: "var(--color-ink)" }}>
+                  Regenerating your report
+                </h2>
+                {report?.site_name && (
+                  <p className="text-base font-medium" style={{ color: "color-mix(in srgb, var(--color-ink) 55%, transparent)" }}>
+                    {[report.site_name, report.site_address].filter(Boolean).join(" — ")}
+                  </p>
+                )}
+                <p className="text-sm mt-1" style={{ color: "color-mix(in srgb, var(--color-ink) 40%, transparent)" }}>
+                  This takes about 5 minutes. The page will refresh automatically when ready.
+                </p>
+              </div>
+
+              {/* Progress track */}
+              <div
+                className="w-64 h-1 rounded-full overflow-hidden"
+                style={{ background: "color-mix(in srgb, var(--color-orange) 12%, transparent)" }}
+              >
+                <div
+                  className="h-full w-2/5 rounded-full"
+                  style={{ background: "var(--color-orange)", animation: "regenProgress 1.8s ease-in-out infinite" }}
+                />
+              </div>
+
+              {/* Pulsing dots — opacity+scale only, no bounce, no layout shift */}
+              <div className="flex gap-2">
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <div
+                    key={i}
+                    className="w-2 h-2 rounded-full"
+                    style={{
+                      background: "var(--color-orange)",
+                      animation: "regenDot 1.2s ease-in-out infinite",
+                      animationDelay: `${i * 0.15}s`,
+                    }}
+                  />
+                ))}
+              </div>
             </div>
           ) : (
             <ReportView

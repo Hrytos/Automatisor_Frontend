@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, type FormEvent } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Mail, KeyRound, Loader2, LogOut, ChevronDown, FileText } from "lucide-react";
+import { Mail, KeyRound, Loader2, LogOut, ChevronDown, FileText, Bell } from "lucide-react";
 import { getAuthSession, setAuthSession, clearAuthSession, type AuthSession } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,13 @@ export function Navbar() {
 
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  // Regeneration notification
+  const [regenPending, setRegenPending] = useState<{ report_id: string; site_name: string } | null>(null);
+  const [regenDone, setRegenDone] = useState<{ report_id: string; site_name: string } | null>(null);
+  const [bellOpen, setBellOpen] = useState(false);
+  const bellRef = useRef<HTMLDivElement>(null);
+  const prevRegenStatus = useRef<string | null>(null);
+
   useEffect(() => {
     setMounted(true);
     setSession(getAuthSession());
@@ -38,11 +45,43 @@ export function Navbar() {
     return () => window.removeEventListener("automatisor:authchange", onAuthChange);
   }, []);
 
+  // Listen for regen status changes broadcast by the report page
+  useEffect(() => {
+    // Check sessionStorage for a pending regen from a previous navigation
+    try {
+      const stored = sessionStorage.getItem("regen_pending");
+      if (stored) setRegenPending(JSON.parse(stored));
+    } catch { /* ignore */ }
+
+    function onRegenStatus(e: Event) {
+      const { status, report_id, site_name } = (e as CustomEvent).detail;
+      if (status === "queued") {
+        setRegenPending({ report_id, site_name });
+        setRegenDone(null);
+        prevRegenStatus.current = "queued";
+      } else if (status === null && prevRegenStatus.current === "queued") {
+        // transitioned from queued → done
+        setRegenDone({ report_id, site_name });
+        setRegenPending(null);
+        setBellOpen(true);
+        prevRegenStatus.current = null;
+      } else {
+        setRegenPending(null);
+        prevRegenStatus.current = status;
+      }
+    }
+    window.addEventListener("automatisor:regen-status", onRegenStatus);
+    return () => window.removeEventListener("automatisor:regen-status", onRegenStatus);
+  }, []);
+
   // Close dropdown on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setOpen(false);
+      }
+      if (bellRef.current && !bellRef.current.contains(e.target as Node)) {
+        setBellOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClick);
@@ -148,9 +187,65 @@ export function Navbar() {
         </span>
       </Link>
 
-      {/* Auth area */}
+      {/* Right side */}
       {mounted && (
-        <div className="relative" ref={dropdownRef}>
+        <div className="flex items-center gap-2">
+          {/* Bell notification */}
+          {session && (regenPending || regenDone) && (
+            <div className="relative" ref={bellRef}>
+              <button
+                onClick={() => setBellOpen((o) => !o)}
+                className="relative w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface transition-colors"
+              >
+                <Bell className="w-4 h-4 text-ink-mid" />
+                {(regenPending || regenDone) && (
+                  <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-orange border-2 border-white" />
+                )}
+              </button>
+              {bellOpen && (
+                <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-ink/10 rounded-xl shadow-lg overflow-hidden">
+                  <div className="px-4 py-2.5 border-b border-ink/5">
+                    <p className="text-xs font-semibold text-ink-soft uppercase tracking-wide">Notifications</p>
+                  </div>
+                  {regenPending && (
+                    <div className="px-4 py-3 flex items-start gap-3">
+                      <div className="mt-0.5 w-7 h-7 rounded-full bg-orange/10 flex items-center justify-center flex-shrink-0">
+                        <Loader2 className="w-3.5 h-3.5 text-orange animate-spin" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-ink">Report regenerating</p>
+                        <p className="text-xs text-ink-soft mt-0.5 leading-relaxed">
+                          {regenPending.site_name || "Your report"} is being updated. ~5 minutes.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  {regenDone && (
+                    <div className="px-4 py-3 flex items-start gap-3">
+                      <div className="mt-0.5 w-7 h-7 rounded-full bg-teal/10 flex items-center justify-center flex-shrink-0">
+                        <span className="text-teal text-base">✓</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-ink">Report ready</p>
+                        <p className="text-xs text-ink-soft mt-0.5 leading-relaxed">
+                          {regenDone.site_name || "Your report"} has been regenerated.
+                        </p>
+                        <button
+                          onClick={() => { setBellOpen(false); setRegenDone(null); }}
+                          className="mt-2 text-xs font-medium text-orange hover:underline"
+                        >
+                          View report →
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Auth area */}
+          <div className="relative" ref={dropdownRef}>
           {session ? (
             /* Logged-in avatar button */
             <button
@@ -262,6 +357,7 @@ export function Navbar() {
               )}
             </div>
           )}
+          </div>
         </div>
       )}
     </nav>
