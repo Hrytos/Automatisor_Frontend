@@ -78,8 +78,8 @@ export default function ReportPage() {
 
       setReport(data);
 
-      // Fire site list fetch in parallel immediately
-      if (data.account_id) {
+      // Only show site switcher for authenticated (logged-in) users
+      if (data.account_id && session) {
         fetch(
           `/api/reports/by-account/${data.account_id}`,
           { credentials: "include" }
