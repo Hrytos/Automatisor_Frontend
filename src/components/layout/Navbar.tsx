@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Loader2, LogOut, ChevronDown, FileText, Bell, CheckCircle2, XCircle, X } from "lucide-react";
+import { Loader2, LogOut, ChevronDown, Bell, CheckCircle2, XCircle, X } from "lucide-react";
 import { getAuthSession, clearAuthSession, type AuthSession } from "@/lib/auth";
 import { FreshchatWidget } from "@/components/FreshchatWidget";
 
@@ -294,16 +294,6 @@ export function Navbar() {
                     </span>
                   )}
                 </div>
-                {!session.is_admin && (
-                  <Link
-                    href="/reports"
-                    onClick={() => setOpen(false)}
-                    className="w-full flex items-center gap-2 px-4 py-3 text-sm text-ink-mid hover:text-ink hover:bg-surface transition-colors"
-                  >
-                    <FileText className="w-4 h-4" />
-                    My Reports
-                  </Link>
-                )}
                 <button
                   onClick={handleSignOut}
                   className="w-full flex items-center gap-2 px-4 py-3 text-sm text-ink-mid hover:text-ink hover:bg-surface transition-colors"
