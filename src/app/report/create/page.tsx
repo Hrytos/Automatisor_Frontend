@@ -70,11 +70,35 @@ export default function CreateReportPage() {
 
   // ── Auth check ───────────────────────────────────────────────────────────────
   useEffect(() => {
-    const session = getAuthSession();
-    const admin = session?.is_admin ?? false;
-    setIsAdmin(admin);
-    setAuthChecked(true);
-    if (admin) loadAccounts();
+    async function checkAuth() {
+      // Fast path — session already in storage
+      if (getAuthSession()) {
+        const admin = getAuthSession()!.is_admin;
+        setIsAdmin(admin);
+        setAuthChecked(true);
+        if (admin) loadAccounts();
+        return;
+      }
+
+      // No local session yet — SessionRefresher may still be running /auth/me.
+      // Wait up to 2 s for the authchange event before deciding.
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, 2000);
+        function onAuth() {
+          clearTimeout(timer);
+          window.removeEventListener("automatisor:authchange", onAuth);
+          resolve();
+        }
+        window.addEventListener("automatisor:authchange", onAuth);
+      });
+
+      const admin = getAuthSession()?.is_admin ?? false;
+      setIsAdmin(admin);
+      setAuthChecked(true);
+      if (admin) loadAccounts();
+    }
+    checkAuth();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function loadAccounts() {

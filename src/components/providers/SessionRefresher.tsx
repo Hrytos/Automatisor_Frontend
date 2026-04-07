@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { getAuthSession, clearAuthSession } from "@/lib/auth";
+import { getAuthSession, setAuthSession, clearAuthSession } from "@/lib/auth";
 
 // Silently refresh the access_token every 30 minutes while the user is logged in.
 // The backend /auth/refresh endpoint swaps the refresh_token cookie for a new
@@ -10,18 +10,37 @@ const REFRESH_INTERVAL_MS = 30 * 60 * 1000;
 
 export function SessionRefresher() {
   useEffect(() => {
-    const refresh = async () => {
-      if (!getAuthSession()) return; // not logged in — nothing to refresh
+    const syncSession = async () => {
+      const existing = getAuthSession();
 
+      if (!existing) {
+        // No local session — but a valid cookie might exist (e.g. new tab).
+        // Call /auth/me to check and populate sessionStorage if so.
+        try {
+          const res = await fetch("/api/auth/me", { credentials: "include" });
+          if (res.ok) {
+            const data = await res.json();
+            setAuthSession({
+              user_id: data.user_id,
+              email: data.email,
+              account_id: data.account_id ?? null,
+              is_admin: data.is_admin ?? false,
+            });
+          }
+        } catch {
+          // Network error or not authenticated — ignore.
+        }
+        return;
+      }
+
+      // Session exists — silently refresh the access_token.
       try {
         const res = await fetch("/api/auth/refresh", {
           method: "POST",
           credentials: "include",
         });
-
         if (res.status === 401) {
-          // Refresh token expired or revoked — clear local session so the UI
-          // shows the logged-out state on the next navigation.
+          // Refresh token expired or revoked — clear local session.
           clearAuthSession();
         }
       } catch {
@@ -29,10 +48,10 @@ export function SessionRefresher() {
       }
     };
 
-    // Refresh immediately on mount (catches tab restores / long suspensions),
-    // then again every 30 minutes.
-    refresh();
-    const id = setInterval(refresh, REFRESH_INTERVAL_MS);
+    // Sync on mount (catches tab restores / new tabs / long suspensions),
+    // then refresh every 30 minutes.
+    syncSession();
+    const id = setInterval(syncSession, REFRESH_INTERVAL_MS);
     return () => clearInterval(id);
   }, []);
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, Loader2 } from "lucide-react";
 import { notFound } from "next/navigation";
@@ -30,6 +30,7 @@ export default function ReportPage() {
   const [report, setReport]         = useState<Report | null>(null);
   const [loading, setLoading]       = useState(true);
   const [notFoundFlag, setNotFound] = useState(false);
+  const [fetchError, setFetchError] = useState(false);
 
   const [siteList, setSiteList]           = useState<SiteSwitcherItem[]>([]);
   const [switcherOpen, setSwitcherOpen]   = useState(false);
@@ -45,9 +46,10 @@ export default function ReportPage() {
     return () => window.removeEventListener("automatisor:authchange", onAuthChange);
   }, []);
 
-  async function fetchReport(background = false) {
+  const fetchReport = useCallback(async (background = false) => {
     if (!background) setLoading(true);
     setNotFound(false);
+    setFetchError(false);
     const session = getAuthSession();
 
     try {
@@ -89,11 +91,11 @@ export default function ReportPage() {
           .catch(() => {});
       }
     } catch {
-      // silently fail
+      if (!background) setFetchError(true);
     } finally {
       setLoading(false);
     }
-  }
+  }, [slug]);
 
   useEffect(() => {
     fetchReport();
@@ -121,8 +123,10 @@ export default function ReportPage() {
   }, [report?.regeneration_status]);
 
   // ── Broadcast regen status so the Navbar notification bell can react ─────────
-  useEffect(() => {
-    const status = report?.regeneration_status ?? null;
+  useEffect(() => {    // Guard: report is null until the first fetch completes. Firing with a null
+    // status before data arrives causes the Navbar to mis-read a queued-→-done
+    // transition and create a spurious “Report ready” notification.
+    if (!report) return;    const status = report?.regeneration_status ?? null;
     const siteName = report?.site_name ?? "";
     window.dispatchEvent(
       new CustomEvent("automatisor:regen-status", { detail: { status, report_id: slug, site_name: siteName } })
@@ -137,8 +141,30 @@ export default function ReportPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [report?.regeneration_status]);
 
-  if (notFoundFlag || !report) {
+  if (notFoundFlag) {
     if (!loading) notFound();
+  }
+
+  // Network / server error on initial load — show a user-friendly message
+  if (fetchError && !loading && !report) {
+    return (
+      <div className="flex flex-col h-screen">
+        <Navbar />
+        <div className="flex flex-1 items-center justify-center px-6">
+          <div className="text-center max-w-sm">
+            <p className="text-sm text-ink-mid mb-4">
+              Something went wrong loading this report. Please check your connection and try again.
+            </p>
+            <button
+              onClick={() => fetchReport()}
+              className="text-sm font-medium text-orange hover:underline"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const siteSwitcher = siteList.length > 1 ? (

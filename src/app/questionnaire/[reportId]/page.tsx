@@ -423,7 +423,7 @@ export default function QuestionnairePage() {
   const router = useRouter();
   const reportId = params.reportId as string;
 
-  const adminUser = isAdmin();
+  const [adminUser, setAdminUser] = useState(() => isAdmin());
   const [currentSection, setCurrentSection] = useState(0);
   const [view, setView] = useState<"questions" | "summary">("questions");
   const [answers, setAnswers] = useState<Answers>({});
@@ -436,6 +436,10 @@ export default function QuestionnairePage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [regenerationStatus, setRegenerationStatus] = useState<string | null>(null);
+  // Tracks when the first server round-trip for this reportId has completed.
+  // The broadcast effect is gated on this so it never fires with the default
+  // null status before we know the real server-side value.
+  const [questDataLoaded, setQuestDataLoaded] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const savedAnswersRef = useRef<Answers>({});
 
@@ -497,12 +501,27 @@ export default function QuestionnairePage() {
     } catch (err: unknown) {
       setLoadError(err instanceof Error ? err.message : "Could not load questionnaire.");
     } finally {
+      setQuestDataLoaded(true);
       setLoading(false);
     }
   }, [reportId]);
 
   useEffect(() => {
     loadAnswers();
+  }, [loadAnswers]);
+
+  // ── Keep adminUser in sync with auth state ───────────────────────────────────
+  // Also re-run loadAnswers if we were in guest mode (handles new-tab session sync:
+  // SessionRefresher populates sessionStorage after mount and fires authchange).
+  useEffect(() => {
+    function onAuthChange() {
+      setAdminUser(isAdmin());
+      // Re-attempt loading answers — loadAnswers checks getAuthSession() freshly,
+      // so if SessionRefresher just populated it this will transition out of guest mode.
+      loadAnswers();
+    }
+    window.addEventListener("automatisor:authchange", onAuthChange);
+    return () => window.removeEventListener("automatisor:authchange", onAuthChange);
   }, [loadAnswers]);
 
   // ── Poll every 30s while regeneration is queued ────────────────────────────
@@ -535,14 +554,17 @@ export default function QuestionnairePage() {
   // Mirrors the same effect on the report page so that navigating between pages
   // doesn't cause the Navbar to treat an already-seen status as a new transition.
   useEffect(() => {
-    if (!reportId) return;
+    // Guard: regenerationStatus starts as null (useState default) and siteName starts
+    // as "" — firing before the server responds causes the Navbar to mis-read a
+    // queued→done transition and create spurious "Report ready" notifications.
+    if (!reportId || !questDataLoaded) return;
     window.dispatchEvent(
       new CustomEvent("automatisor:regen-status", {
         detail: { status: regenerationStatus, report_id: reportId, site_name: siteName },
       })
     );
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [regenerationStatus]);
+  }, [regenerationStatus, questDataLoaded]);
 
   const section = sections[currentSection];
   const isFirst = currentSection === 0;

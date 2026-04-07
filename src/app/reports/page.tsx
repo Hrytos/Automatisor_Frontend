@@ -24,13 +24,35 @@ export default function MyReportsPage() {
   const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
-    const session = getAuthSession();
-    if (!session) {
-      router.replace("/login");
-      return;
+    async function checkAuth() {
+      // Fast path — session already in storage
+      if (getAuthSession()) {
+        setAuthChecked(true);
+        loadReports();
+        return;
+      }
+
+      // No local session yet — SessionRefresher may still be running /auth/me.
+      // Wait up to 2 s for the authchange event before redirecting.
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, 2000);
+        function onAuth() {
+          clearTimeout(timer);
+          window.removeEventListener("automatisor:authchange", onAuth);
+          resolve();
+        }
+        window.addEventListener("automatisor:authchange", onAuth);
+      });
+
+      if (!getAuthSession()) {
+        router.replace("/login");
+        return;
+      }
+      setAuthChecked(true);
+      loadReports();
     }
-    setAuthChecked(true);
-    loadReports();
+
+    checkAuth();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
