@@ -429,6 +429,7 @@ export default function QuestionnairePage() {
   const [answers, setAnswers] = useState<Answers>({});
   const [siteName, setSiteName]     = useState("");
   const [siteAddress, setSiteAddress] = useState("");
+  const [siteId, setSiteId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isGuest, setIsGuest] = useState(false);
@@ -491,6 +492,7 @@ export default function QuestionnairePage() {
       if (data.site_name) setSiteName(data.site_name);
       if (data.site_address || data.site_location)
         setSiteAddress(data.site_address || data.site_location);
+      if (data.site_id) setSiteId(data.site_id);
       setRegenerationStatus(data.regeneration_status ?? null);
     } catch (err: unknown) {
       setLoadError(err instanceof Error ? err.message : "Could not load questionnaire.");
@@ -528,6 +530,19 @@ export default function QuestionnairePage() {
       if (pollRef.current) clearInterval(pollRef.current);
     };
   }, [regenerationStatus, reportId]);
+
+  // ── Broadcast regen status so the Navbar notification bell can react ────────
+  // Mirrors the same effect on the report page so that navigating between pages
+  // doesn't cause the Navbar to treat an already-seen status as a new transition.
+  useEffect(() => {
+    if (!reportId) return;
+    window.dispatchEvent(
+      new CustomEvent("automatisor:regen-status", {
+        detail: { status: regenerationStatus, report_id: reportId, site_name: siteName },
+      })
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [regenerationStatus]);
 
   const section = sections[currentSection];
   const isFirst = currentSection === 0;
@@ -594,6 +609,7 @@ export default function QuestionnairePage() {
       // Fire event if answers differ from what was last loaded/saved
       if (JSON.stringify(answers) !== JSON.stringify(savedAnswersRef.current)) {
         trackEvent("questionnaire_modified_no_regen", reportId, {
+          site_id: siteId,
           site_name: siteName,
           changed_fields: Object.keys(answers).filter(
             (k) => JSON.stringify(answers[k]) !== JSON.stringify(savedAnswersRef.current[k])
@@ -634,7 +650,7 @@ export default function QuestionnairePage() {
         throw new Error(d.detail || `Failed to queue regeneration (${regenRes.status})`);
       }
       setRegenerationStatus("queued");
-      trackEvent("report_regenerated", reportId, { site_name: siteName });
+      trackEvent("report_regenerated", reportId, { site_id: siteId, site_name: siteName });
       setView("questions");
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err: unknown) {
@@ -784,17 +800,22 @@ export default function QuestionnairePage() {
                   </p>
                 )}
                 <div className="flex flex-col items-center gap-3 pt-8 border-t border-ink/5">
-                  {!allRequiredAnswered && (
+                  {regenerationStatus === "queued" && (
+                    <p className="text-xs text-orange text-center font-medium">
+                      Regeneration in progress — please wait until it completes before regenerating again.
+                    </p>
+                  )}
+                  {!allRequiredAnswered && regenerationStatus !== "queued" && (
                     <p className="text-xs text-ink-soft text-center">
                       Complete all required questions across every section to regenerate your report.
                     </p>
                   )}
                   <Button
                     onClick={handleRegenerate}
-                    disabled={!allRequiredAnswered || submitting}
+                    disabled={!allRequiredAnswered || submitting || regenerationStatus === "queued"}
                     className="gap-1.5 w-full max-w-xs"
                   >
-                    {submitting ? (
+                    {submitting || regenerationStatus === "queued" ? (
                       <>
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
                         Regenerating…

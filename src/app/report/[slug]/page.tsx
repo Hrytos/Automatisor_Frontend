@@ -45,8 +45,8 @@ export default function ReportPage() {
     return () => window.removeEventListener("automatisor:authchange", onAuthChange);
   }, []);
 
-  async function fetchReport() {
-    setLoading(true);
+  async function fetchReport(background = false) {
+    if (!background) setLoading(true);
     setNotFound(false);
     const session = getAuthSession();
 
@@ -106,7 +106,7 @@ export default function ReportPage() {
   useEffect(() => {
     if (report?.regeneration_status === "queued") {
       pollRef.current = setInterval(() => {
-        fetchReport();
+        fetchReport(true);
       }, 30_000);
     } else {
       if (pollRef.current) {

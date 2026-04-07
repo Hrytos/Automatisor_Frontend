@@ -60,6 +60,33 @@ export function ReportView({ report, slug, siteSwitcher, onUnlock }: ReportViewP
               {siteSwitcher && <div>{siteSwitcher}</div>}
             </div>
 
+            {/* Orientation — above company name */}
+            <div className="mb-7 rounded-xl border-l-4 border-orange bg-orange-light px-5 py-4 space-y-3">
+              <div>
+                <p className="text-sm font-semibold text-ink mb-1">How to read this report?</p>
+                <p className="text-sm text-ink-mid leading-relaxed">
+                  This report summarises operations and challenges at your facility using factual,
+                  real-world data and categorises it across 5 key dimensions — Operational Profile,
+                  Operational Performance, Labor &amp; Workforce, Safety &amp; Compliance, Technology
+                  &amp; Infrastructure. Each dimension includes a brief snapshot of observations and
+                  identifies the top 3 risks.
+                </p>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-ink mb-1">What&apos;s next?</p>
+                <p className="text-sm text-ink-mid leading-relaxed">
+                  You can further customise this report to your facility by editing answers and by
+                  answering more questions under the Questionnaire section on the sidebar. Once you
+                  have made all the changes you want, you can regenerate the report to view the
+                  updated summary. You can regenerate the report as many times as you need to. Want
+                  to understand this further and see recommendations?{" "}
+                  <span className="text-orange font-semibold cursor-pointer hover:underline">
+                    Chat with us.
+                  </span>
+                </p>
+              </div>
+            </div>
+
             <h1 className="font-serif text-3xl md:text-4xl text-ink leading-tight mb-3">
               {report.site_name}
             </h1>

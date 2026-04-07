@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { DM_Sans, DM_Serif_Display } from "next/font/google";
 import "./globals.css";
 import { PostHogProvider } from "@/components/providers/PostHogProvider";
+import { SessionRefresher } from "@/components/providers/SessionRefresher";
 
 const dmSans = DM_Sans({
   variable: "--font-sans",
@@ -34,7 +35,10 @@ export default function RootLayout({
       className={`${dmSans.variable} ${dmSerif.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col font-sans text-[15px] leading-relaxed">
-        <PostHogProvider>{children}</PostHogProvider>
+        <PostHogProvider>
+          <SessionRefresher />
+          {children}
+        </PostHogProvider>
       </body>
     </html>
   );
