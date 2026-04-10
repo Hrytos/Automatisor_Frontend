@@ -140,7 +140,7 @@ export function Navbar() {
   return (
     <>
       <FreshchatWidget enabled={enableFreshchat} identity={freshchatIdentity} />
-      <nav className="sticky top-0 z-50 flex items-center justify-between border-b border-ink/10 bg-white px-6 py-4 md:px-12">
+      <nav className="sticky top-0 z-50 flex items-center justify-between border-b border-ink/10 bg-white px-4 py-3 md:px-12 md:py-4">
       {/* Logo */}
       <Link href="/" className="flex items-center gap-2">
         <span className="font-serif text-xl text-ink tracking-tight">
@@ -186,7 +186,7 @@ export function Navbar() {
                 </button>
 
                 {bellOpen && (
-                  <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-ink/10 rounded-xl shadow-lg overflow-hidden z-50">
+                  <div className="absolute right-0 top-full mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white border border-ink/10 rounded-xl shadow-lg overflow-hidden z-50">
                     {/* Header */}
                     <div className="px-4 py-2.5 border-b border-ink/5 flex items-center justify-between">
                       <p className="text-xs font-semibold text-ink-soft uppercase tracking-wide">Notifications</p>
@@ -283,7 +283,7 @@ export function Navbar() {
 
           {/* Dropdown panel — only for logged-in users */}
           {open && session && (
-            <div className="absolute right-0 top-full mt-2 w-72 bg-white border border-ink/10 rounded-xl shadow-lg overflow-hidden">
+            <div className="absolute right-0 top-full mt-2 w-72 max-w-[calc(100vw-2rem)] bg-white border border-ink/10 rounded-xl shadow-lg overflow-hidden">
               <div>
                 <div className="px-4 py-3 border-b border-ink/5">
                   <p className="text-xs text-ink-soft mb-0.5">Signed in as</p>

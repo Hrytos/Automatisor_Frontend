@@ -14,6 +14,7 @@ interface FreshchatApi {
   hide?: () => void;
   setExternalId?: (externalId: string) => void;
   user?: FreshchatUserApi;
+  on?: (event: string, cb: () => void) => void;
 }
 
 declare global {
@@ -87,6 +88,48 @@ export function FreshchatWidget({ enabled, identity }: FreshchatWidgetProps) {
     script.async = true;
     script.setAttribute("chat", "true");
     document.head.appendChild(script);
+
+    // ── Mobile: prevent fullscreen takeover ────────────────────────────────
+    // Freshchat hard-codes a full-viewport layout for narrow screens by setting
+    // inline styles via JavaScript. CSS overrides lose because Freshchat uses
+    // setProperty with "important" internally. We win by hooking into the
+    // widget:opened event and applying our own inline !important values.
+    const BOTTOM_OFFSET = 76; // mobile bottom nav (56px) + gap (20px)
+
+    function constrainMobilePanel() {
+      if (window.innerWidth >= 1024) return;
+      const frame = document.getElementById("fc_frame");
+      if (!frame) return;
+      const panelW = Math.min(Math.round(window.innerWidth * 0.92), 400);
+      const constraints: [string, string][] = [
+        ["top",           "auto"],
+        ["left",          "auto"],
+        ["right",         "16px"],
+        ["bottom",        `${BOTTOM_OFFSET}px`],
+        ["width",         `${panelW}px`],
+        ["height",        "62vh"],
+        ["max-height",    "62vh"],
+        ["min-height",    "0"],
+        ["border-radius", "12px"],
+        ["overflow",      "hidden"],
+      ];
+      constraints.forEach(([prop, val]) => frame.style.setProperty(prop, val, "important"));
+    }
+
+    // Poll until fcWidget.on is available, then register the open handler
+    const hookInterval = window.setInterval(() => {
+      if (!window.fcWidget?.on) return;
+      window.clearInterval(hookInterval);
+      window.fcWidget.on("widget:opened", constrainMobilePanel);
+    }, 300);
+
+    // Safety: abandon poll after 15 s
+    const hookTimeout = window.setTimeout(() => window.clearInterval(hookInterval), 15_000);
+
+    return () => {
+      window.clearInterval(hookInterval);
+      window.clearTimeout(hookTimeout);
+    };
   }, [enabled]);
 
   useEffect(() => {

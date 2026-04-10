@@ -868,7 +868,7 @@ export default function QuestionnairePage() {
       <Navbar />
       <div className="flex flex-1 min-h-0">
         <ReportSidebar slug={reportId} isAdmin={adminUser} />
-        <main className="flex-1 overflow-y-auto relative">
+        <main className="flex-1 overflow-y-auto relative pb-16 lg:pb-0">
 
           {/* ── Regeneration in-progress banner ── */}
           {regenerationStatus === "queued" && (

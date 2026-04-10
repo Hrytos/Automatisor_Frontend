@@ -125,3 +125,19 @@
   0%, 100% { opacity: 0.25; transform: scale(0.8); }
   50%       { opacity: 1;    transform: scale(1.2); }
 }
+
+/* ── Freshchat widget — keep launcher above the mobile bottom nav ─────────── */
+/* The panel constraints are applied programmatically in FreshchatWidget.tsx. */
+/* This CSS only nudges the closed launcher button so it clears the bottom    */
+/* nav bar (56 px) + a small gap.                                             */
+@media (max-width: 1023px) {
+  #fc_frame:not(.fc-open),
+  .freshchat-widget-button {
+    bottom: 76px !important;
+  }
+}
+
+/* ── iOS safe-area support for the mobile bottom nav ─────────────────────── */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}

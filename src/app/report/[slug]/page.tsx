@@ -229,7 +229,7 @@ export default function ReportPage() {
           slug={slug}
           isAdmin={adminUser}
         />
-        <main className="flex-1 overflow-y-auto relative">
+        <main className="flex-1 overflow-y-auto relative pb-16 lg:pb-0">
           {report?.regeneration_status === "error" && !loading && (
             <div className="flex items-center gap-2.5 px-5 py-3 bg-red-50 border-b border-red-200">
               <p className="text-[13px] text-red-700 font-medium">
