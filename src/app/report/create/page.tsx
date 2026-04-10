@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Copy, Check, ShieldAlert, ChevronDown, Search, X, ExternalLink } from "lucide-react";
+import { Copy, Check, ShieldAlert, ChevronDown, Search, X, ExternalLink, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Navbar } from "@/components/layout/Navbar";
 import { getAuthSession } from "@/lib/auth";
@@ -160,6 +160,9 @@ export default function CreateReportPage() {
   const [generating, setGenerating]         = useState(false);
   const [copiedId, setCopiedId]             = useState<string | null>(null);
   const [error, setError]                   = useState<string | null>(null);
+  const [shareEmail, setShareEmail]         = useState("");
+  const [sharing, setSharing]               = useState(false);
+  const [shareStatus, setShareStatus]       = useState<string | null>(null);
 
   // ── Auth check ───────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -211,6 +214,8 @@ export default function CreateReportPage() {
     setSelectedAccount(accountId);
     setCheckedReportIds(new Set());
     setGeneratedLinks(null);
+    setShareStatus(null);
+    setShareEmail("");
     setSites([]);
     if (!accountId) return;
 
@@ -240,6 +245,7 @@ export default function CreateReportPage() {
 
   async function handleGenerateLinks() {
     setError(null);
+    setShareStatus(null);
     const session = getAuthSession();
     if (!session) { setError("Session expired. Please log in again."); return; }
 
@@ -256,10 +262,40 @@ export default function CreateReportPage() {
         throw new Error(data.detail || `Server returned ${res.status}`);
       }
       setGeneratedLinks(await res.json());
+      setShareEmail("");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
       setGenerating(false);
+    }
+  }
+
+  async function handleShareLink(reportId: string) {
+    setShareStatus(null);
+    const recipient = shareEmail.trim();
+    if (!recipient) {
+      setShareStatus("Enter a recipient email first.");
+      return;
+    }
+
+    setSharing(true);
+    try {
+      const res = await fetch(`/api/reports/share`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ report_id: reportId, recipient_email: recipient }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail || `Server returned ${res.status}`);
+      }
+      setShareStatus(`Shared with ${recipient}`);
+      setShareEmail("");
+    } catch (err: unknown) {
+      setShareStatus(err instanceof Error ? err.message : "Failed to share link.");
+    } finally {
+      setSharing(false);
     }
   }
 
@@ -447,6 +483,32 @@ export default function CreateReportPage() {
                       >
                         <ExternalLink className="w-3.5 h-3.5" />View
                       </a>
+                    </div>
+                    <div className="pt-1 border-t border-ink/5 space-y-2">
+                      <p className="text-[11px] font-medium uppercase tracking-wider text-ink-soft">Share by email</p>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <input
+                          type="email"
+                          value={shareEmail}
+                          onChange={(e) => setShareEmail(e.target.value)}
+                          placeholder="Recipient email"
+                          className="flex-1 rounded-lg border border-ink/10 bg-white px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-orange/30 focus:border-orange"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleShareLink(firstId)}
+                          disabled={sharing}
+                          className="shrink-0 inline-flex items-center justify-center gap-1.5 text-sm font-medium px-3.5 py-2 rounded-lg border border-ink/10 hover:border-orange/40 hover:text-orange transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                          <Send className="w-3.5 h-3.5" />
+                          {sharing ? "Sending..." : "Share"}
+                        </button>
+                      </div>
+                      {shareStatus && (
+                        <p className={`text-xs ${shareStatus.startsWith("Shared with") ? "text-teal" : "text-red-600"}`}>
+                          {shareStatus}
+                        </p>
+                      )}
                     </div>
                     {generatedLinks.length > 1 && (
                       <ul className="space-y-0.5 pt-1 border-t border-ink/5">
