@@ -17,6 +17,7 @@ import {
 type Tab = {
   id: string;
   label: string;
+  mobileLabel?: string;
   icon: React.ComponentType<{ className?: string }>;
   href: (slug: string) => string;
   enabled: boolean;
@@ -41,6 +42,7 @@ const tabs: Tab[] = [
   {
     id: "questionnaire",
     label: "Questionnaire",
+    mobileLabel: "Questions",
     icon: ClipboardList,
     href: (slug: string) => `/questionnaire/${slug}`,
     enabled: true,
@@ -49,6 +51,7 @@ const tabs: Tab[] = [
   {
     id: "recommendations",
     label: "Recommendations",
+    mobileLabel: "Recs",
     icon: Lightbulb,
     href: () => "#",
     enabled: false,
@@ -67,6 +70,7 @@ const tabs: Tab[] = [
   {
     id: "create-report",
     label: "Create Report",
+    mobileLabel: "Create",
     icon: FilePlus,
     href: () => "/report/create",
     enabled: true,
@@ -105,24 +109,17 @@ export function ReportSidebar({ slug = "", isAdmin = false }: ReportSidebarProps
         const inner = (
           <>
             <tab.icon
-              className={`w-5 h-5 ${
+              className={`w-5 h-5 flex-shrink-0 ${
                 active ? "text-orange" : disabled ? "text-ink/20" : "text-ink-soft"
               }`}
             />
             <span
-              className={`text-[10px] mt-0.5 leading-none ${
+              className={`text-[10px] mt-0.5 leading-none truncate max-w-full ${
                 active ? "text-orange font-semibold" : disabled ? "text-ink/20" : "text-ink-soft"
               }`}
             >
-              {tab.label}
+              {tab.mobileLabel ?? tab.label}
             </span>
-            {tab.badge && !disabled && (
-              <span className={`text-[8px] px-1 rounded font-medium leading-none ${
-                tab.adminOnly ? "text-orange/60" : "text-ink-soft/60"
-              }`}>
-                {tab.badge}
-              </span>
-            )}
           </>
         );
 
@@ -130,7 +127,7 @@ export function ReportSidebar({ slug = "", isAdmin = false }: ReportSidebarProps
           return (
             <div
               key={tab.id}
-              className="flex flex-1 flex-col items-center justify-center py-2.5 gap-0.5 cursor-not-allowed"
+              className="flex flex-1 flex-col items-center justify-center py-3 gap-1 cursor-not-allowed min-w-0"
             >
               {inner}
             </div>
@@ -141,7 +138,7 @@ export function ReportSidebar({ slug = "", isAdmin = false }: ReportSidebarProps
           <Link
             key={tab.id}
             href={tab.href(slug)}
-            className={`flex flex-1 flex-col items-center justify-center py-2.5 gap-0.5 transition-colors ${
+            className={`flex flex-1 flex-col items-center justify-center py-3 gap-1 transition-colors min-w-0 ${
               active ? "bg-orange/5" : "hover:bg-surface active:bg-surface"
             }`}
           >
